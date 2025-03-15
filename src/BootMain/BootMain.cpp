@@ -16,7 +16,7 @@ static void CreateSuspendProcessInjection(std::string cmdline, std::string dllPa
 		return;
 	}
 	// Allocate memory in the target process
-	auto pDllPath = VirtualAllocEx(pi.hProcess, NULL, dllPath.size(), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	auto pDllPath = VirtualAllocEx(pi.hProcess, NULL, dllPath.size() + 1, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (!pDllPath) {
 		printf("Failed to allocate memory in target process: %d\n", GetLastError());
 		TerminateProcess(pi.hProcess, 0);

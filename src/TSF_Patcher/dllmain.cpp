@@ -52,6 +52,8 @@ static void __cdecl RequestTSF(int* open) {
 }
 
 static void PatchAsync(LPARAM lParam) {
+	// 等10秒游戏窗口初始化完成
+	Sleep(10000);
 
 	auto hModule = GetModuleHandleA(NULL);
 
@@ -92,6 +94,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 		/*AllocConsole();
 
 		freopen_s(&file,"CONOUT$", "w", stdout);*/
+
 		break;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
