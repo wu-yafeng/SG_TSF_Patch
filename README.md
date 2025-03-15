@@ -10,7 +10,7 @@
 
 ## 开始
 
-在Release中下载二进制程序，并解压到一个全英文的目录，并运行 BootMain.exe。之后会自动打开QQ三国，并注入了输入法的补丁插件。
+在 [Release](https://github.com/wu-yafeng/SG_TSF_Patch/releases) 中下载二进制程序，并解压到一个全英文的目录，并运行 BootMain.exe。之后会自动打开QQ三国，并注入了输入法的补丁插件。
 
 ## 说明
 
