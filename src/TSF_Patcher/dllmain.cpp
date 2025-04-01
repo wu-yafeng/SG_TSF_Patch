@@ -5,50 +5,75 @@
 
 typedef void(__cdecl* GameUIHookProc_t)(int*);
 
-static void __cdecl ToggleIME(int* lParam) {
-	auto keepState = lParam && *lParam != 0;
-	// enable IME or disable IME
-	HRESULT hr{};
-	ITfThreadMgr* pThreadMgr = nullptr;
-	hr = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr, (void**)&pThreadMgr);
-	if (FAILED(hr) || pThreadMgr == nullptr) {
-		printf("Failed to create ITfThreadMgr instance: %#X \n", hr);
+static void __cdecl DeactiveKeyboard(int* lParam) {
+	auto deactive = lParam && *lParam == 0;
+
+	if (!deactive) {
 		return;
 	}
-	TfClientId clientId = 0;
-	if (!keepState) {
+
+	ITfThreadMgr2* pThreadMgr = nullptr;
+
+	HRESULT hr = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr2, (void**)&pThreadMgr);
+
+	if (!SUCCEEDED(hr)) {
+		return;
+	}
+
+	DWORD dwFlags = 0;
+	hr = pThreadMgr->GetActiveFlags(&dwFlags);
+
+	auto activated = (TF_TMF_ACTIVATED & dwFlags) != 0;
+
+	if (activated) {
 		hr = pThreadMgr->Deactivate();
 	}
 
 	pThreadMgr->Release();
 }
-static void __cdecl RequestTSF(int* open) {
-	auto shouldEnableTSF = open && *open != 0;
 
-	if (!shouldEnableTSF) {
+static void __cdecl ActiveKeyboard(int* lParam) {
+	auto active = lParam && *lParam != 0;
+
+	ITfThreadMgr2* pThreadMgr = nullptr;
+
+	HRESULT hr = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr2, (void**)&pThreadMgr);
+
+	if (!SUCCEEDED(hr)) {
 		return;
 	}
 
-	// enable TSF or disable TSF
-	HRESULT hr{};
+	DWORD dwFlags = 0;
+	hr = pThreadMgr->GetActiveFlags(&dwFlags);
 
-	ITfThreadMgr* pThreadMgr = nullptr;
+	auto activated = (TF_TMF_ACTIVATED & dwFlags) != 0;
 
-	hr = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr, (void**)&pThreadMgr);
+	TfClientId tfClientId = TF_CLIENTID_NULL;
+	if (!activated) {
+		hr = pThreadMgr->Activate(&tfClientId);
 
-	if (FAILED(hr) || pThreadMgr == nullptr) {
-		printf("Failed to create ITfThreadMgr instance: %#X \n", hr);
-		return;
+		if (!SUCCEEDED(hr)) {
+			return;
+		}
+
+		ITfDocumentMgr* pDocMgr = nullptr;
+
+		hr = pThreadMgr->CreateDocumentMgr(&pDocMgr);
+
+		ITfContext* context = nullptr;
+		TfEditCookie cookie{};
+		hr = pDocMgr->CreateContext(tfClientId, 0, nullptr, &context, &cookie);
+
+		if (!SUCCEEDED(hr)) {
+			return;
+		}
+		hr = pDocMgr->Push(context);
+
+		if (!SUCCEEDED(hr)) {
+			return;
+		}
+		hr = pThreadMgr->SetFocus(pDocMgr);
 	}
-
-	TfClientId clientId = 0;
-	hr = pThreadMgr->Activate(&clientId);
-
-	if (FAILED(hr)) {
-		printf("Failed to %s TSF\n", shouldEnableTSF ? "activate" : "deactivate");
-	}
-
-	pThreadMgr->Release();
 }
 
 static void PatchAsync(LPARAM lParam) {
@@ -72,8 +97,8 @@ static void PatchAsync(LPARAM lParam) {
 		pGameUIHooks = *(GameUIHookProc_t**)pGameUIHooksBase;
 	}
 
-	pGameUIHooks[31] = RequestTSF;
-	pGameUIHooks[2] = ToggleIME;
+	pGameUIHooks[31] = ActiveKeyboard;
+	pGameUIHooks[2] = DeactiveKeyboard;
 
 	printf("TSF patch success\n");
 }
