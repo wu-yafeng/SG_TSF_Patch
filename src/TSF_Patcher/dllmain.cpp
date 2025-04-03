@@ -5,74 +5,93 @@
 
 typedef void(__cdecl* GameUIHookProc_t)(int*);
 
-static void __cdecl DeactiveKeyboard(int* lParam) {
-	auto deactive = lParam && *lParam == 0;
 
-	if (!deactive) {
+static void _OpenKeyboard(ITfCompartmentMgr* _CompartmentMgr, TfClientId _ClientId, bool _OpenVal) {
+	if (_CompartmentMgr == nullptr) {
 		return;
 	}
+	ITfCompartment* pCompartment = nullptr;
+	VARIANT var;
 
-	ITfThreadMgr2* pThreadMgr = nullptr;
+	if (SUCCEEDED(_CompartmentMgr->GetCompartment(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, &pCompartment))) {
+		if (SUCCEEDED(pCompartment->GetValue(&var))) {
+			if (var.vt == VT_I4) {
+				if (var.lVal != _OpenVal) {
+					var.lVal = _OpenVal;
+					pCompartment->SetValue(_ClientId, &var);
+				}
+			}
+		}
 
-	HRESULT hr = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr2, (void**)&pThreadMgr);
-
-	if (!SUCCEEDED(hr)) {
-		return;
+		pCompartment->Release();
 	}
-
-	DWORD dwFlags = 0;
-	hr = pThreadMgr->GetActiveFlags(&dwFlags);
-
-	auto activated = (TF_TMF_ACTIVATED & dwFlags) != 0;
-
-	if (activated) {
-		hr = pThreadMgr->Deactivate();
-	}
-
-	pThreadMgr->Release();
 }
 
-static void __cdecl ActiveKeyboard(int* lParam) {
-	auto active = lParam && *lParam != 0;
-
-	ITfThreadMgr2* pThreadMgr = nullptr;
-
-	HRESULT hr = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr2, (void**)&pThreadMgr);
-
-	if (!SUCCEEDED(hr)) {
+static void _SwitchConversion(ITfCompartmentMgr* _CompartmentMgr, TfClientId _ClientId, bool _OpenVal) {
+	if (_CompartmentMgr == nullptr) {
 		return;
 	}
+	ITfCompartment* pCompartment = nullptr;
+	VARIANT var;
 
-	DWORD dwFlags = 0;
-	hr = pThreadMgr->GetActiveFlags(&dwFlags);
-
-	auto activated = (TF_TMF_ACTIVATED & dwFlags) != 0;
-
-	TfClientId tfClientId = TF_CLIENTID_NULL;
-	if (!activated) {
-		hr = pThreadMgr->Activate(&tfClientId);
-
-		if (!SUCCEEDED(hr)) {
-			return;
+	if (SUCCEEDED(_CompartmentMgr->GetCompartment(GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION, &pCompartment))) {
+		if (SUCCEEDED(pCompartment->GetValue(&var))) {
+			if (var.vt == VT_I4) {
+				if (_OpenVal) {
+					var.lVal = TF_CONVERSIONMODE_SYMBOL | TF_CONVERSIONMODE_NATIVE;
+					pCompartment->SetValue(_ClientId, &var);
+				}
+				else {
+					var.lVal = TF_CONVERSIONMODE_ALPHANUMERIC;
+					pCompartment->SetValue(_ClientId, &var);
+				}
+			}
 		}
 
-		ITfDocumentMgr* pDocMgr = nullptr;
+		pCompartment->Release();
+	}
+}
 
-		hr = pThreadMgr->CreateDocumentMgr(&pDocMgr);
+static void OnFocusChange(bool hasFocus) {
+	ITfThreadMgr* pThreadMgr = nullptr;
+	ITfCompartmentMgr* pCompMgr = nullptr;
+	ITfCompartment* pCompartment = nullptr;
+	TfClientId clientId;
+	// 创建 ITfThreadMgr 对象
+	if (SUCCEEDED(CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr, (void**)&pThreadMgr))) {
+		// 激活 TSF
+		if (SUCCEEDED(pThreadMgr->Activate(&clientId))) {
+			// 获取 ITfCompartmentMgr 接口
+			if (SUCCEEDED(pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr))) {
+				_OpenKeyboard(pCompMgr, clientId, hasFocus);
 
-		ITfContext* context = nullptr;
-		TfEditCookie cookie{};
-		hr = pDocMgr->CreateContext(tfClientId, 0, nullptr, &context, &cookie);
+				_SwitchConversion(pCompMgr, clientId, true);
 
-		if (!SUCCEEDED(hr)) {
-			return;
+				pCompMgr->Release();
+			}
+			pThreadMgr->Deactivate();
 		}
-		hr = pDocMgr->Push(context);
+		pThreadMgr->Release();
+	}
+}
 
-		if (!SUCCEEDED(hr)) {
-			return;
+static void DeactiveKeyboard(bool _OpenVal) {
+	ITfThreadMgr* pThreadMgr = nullptr;
+	ITfCompartmentMgr* pCompMgr = nullptr;
+	ITfCompartment* pCompartment = nullptr;
+	TfClientId clientId;
+	// 创建 ITfThreadMgr 对象
+	if (SUCCEEDED(CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_ITfThreadMgr, (void**)&pThreadMgr))) {
+		// 激活 TSF
+		if (SUCCEEDED(pThreadMgr->Activate(&clientId))) {
+			// 获取 ITfCompartmentMgr 接口
+			if (SUCCEEDED(pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, (void**)&pCompMgr))) {
+				_OpenKeyboard(pCompMgr, clientId, _OpenVal);
+				pCompMgr->Release();
+			}
+			pThreadMgr->Deactivate();
 		}
-		hr = pThreadMgr->SetFocus(pDocMgr);
+		pThreadMgr->Release();
 	}
 }
 
@@ -97,7 +116,7 @@ static void PatchAsync(LPARAM lParam) {
 		pGameUIHooks = *(GameUIHookProc_t**)pGameUIHooksBase;
 	}
 
-	pGameUIHooks[31] = ActiveKeyboard;
+	pGameUIHooks[31] = OnFocusChange;
 	pGameUIHooks[2] = DeactiveKeyboard;
 
 	printf("TSF patch success\n");
