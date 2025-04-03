@@ -10,11 +10,11 @@
 
 ## 开始
 
-在 [Release](https://github.com/wu-yafeng/SG_TSF_Patch/releases) 中下载二进制程序，并解压到一个全英文的目录，并运行 BootMain.exe。之后会自动打开QQ三国，并注入了输入法的补丁插件。
+在 [Release](https://github.com/wu-yafeng/SG_TSF_Patch/releases) 中下载二进制程序，并解压到一个全英文的目录，管理员身份运行 BootMain.exe。之后会自动打开QQ三国，并注入了输入法的补丁插件。
 
 ## 说明
 
-该插件仅能用在Windows 8.1 及以上的系统，Windows7及以下不需要也不要使用此插件。
+该插件仅能用在Windows 8.1 及以上的系统，Windows7及以下不需要也不要使用此插件。不过在按CTRL+TAB的时候，还是会自动切换为中文，可以参照这一篇文章的方法 https://zhuanlan.zhihu.com/p/23887468991
 
 ## 卸载
 
