@@ -52,7 +52,8 @@ static void _SwitchConversion(ITfCompartmentMgr* _CompartmentMgr, TfClientId _Cl
 	}
 }
 
-static void OnFocusChange(bool hasFocus) {
+static void OnFocusChange(int* lParam) {
+	bool hasFocus = *lParam;
 	ITfThreadMgr* pThreadMgr = nullptr;
 	ITfCompartmentMgr* pCompMgr = nullptr;
 	ITfCompartment* pCompartment = nullptr;
@@ -75,7 +76,8 @@ static void OnFocusChange(bool hasFocus) {
 	}
 }
 
-static void DeactiveKeyboard(bool _OpenVal) {
+static void DeactiveKeyboard(int* lParam) {
+	auto _OpenVal = *lParam;
 	ITfThreadMgr* pThreadMgr = nullptr;
 	ITfCompartmentMgr* pCompMgr = nullptr;
 	ITfCompartment* pCompartment = nullptr;
