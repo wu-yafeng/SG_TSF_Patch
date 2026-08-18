@@ -1,0 +1,63 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag
+        required: true
+        type: string
+      release_name:
+        description: Release name
+        required: false
+        default: ""
+        type: string
+      prerelease:
+        description: Mark as prerelease
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Release|x86
+        run: msbuild SG_TSF_Patch.sln /m /p:Configuration=Release /p:Platform=x86
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          $packageName = "SG_TSF_Patch-${{ github.event.inputs.tag }}-win32"
+          $packageDir = Join-Path $env:RUNNER_TEMP $packageName
+          New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+
+          Copy-Item "Release/BootMain.exe" $packageDir
+          Copy-Item "Release/TSF_Patcher.dll" $packageDir
+
+          $zipPath = Join-Path $env:RUNNER_TEMP ("$packageName.zip")
+          if (Test-Path $zipPath) {
+            Remove-Item $zipPath -Force
+          }
+
+          Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $zipPath
+          "PACKAGE_PATH=$zipPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.release_name != '' && github.event.inputs.release_name || github.event.inputs.tag }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: ${{ env.PACKAGE_PATH }}
